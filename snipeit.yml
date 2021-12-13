@@ -1,0 +1,128 @@
+---
+- hosts: localhost
+  vars_files:
+       - /home/ubuntu/playbook/vars/external_vars.yml
+  handlers:     
+       - include: /home/ubuntu/playbook/handlers/main.yml
+  tasks:
+    - name: Update apt repo and cache on all Debian/Ubuntu boxes
+      become: true
+      apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+
+    - name: Upgrade all packages on servers
+      become: true
+      apt: upgrade=dist force_apt_get=yes
+ 
+
+    - name: Make sure universe repository is enabled
+      become: true
+      apt_repository:
+       repo: deb http://archive.ubuntu.com/ubuntu focal universe
+       state: present
+       update_cache: true
+
+    - name: Install Nginx and mysql
+      become: true
+      apt: name={{ item }} update_cache=yes state=latest
+      loop: [ 'nginx', 'mysql-server', 'php-fpm',  'php-mysql','python3-mysqldb']
+
+    
+    - name: install PHP
+      become: true
+      apt: name={{item}} state=present
+      with_items:
+           - php7.4-cli
+           - php7.4-curl
+           - php7.4-json
+           - php7.4-gd
+           - php7.4-mbstring
+           - php7.4-intl
+           - php7.4-bcmath
+           - php7.4-bz2
+           - php7.4-readline
+           - php7.4-fpm
+           - php7.4-zip
+
+    - name: Install composer
+      become: true
+      shell: curl -sS https://getcomposer.org/installer | php
+
+    - name: Move the file
+      become: true
+      command: mv composer.phar /usr/local/bin/composer
+
+    - name: make composer executable
+      file:
+        path: /usr/local/bin/composer
+        mode: a+x
+        state: file
+   
+    - name: ansible create directory 
+      become: true
+      file:
+        path: /var/www/snipeit
+        state: directory
+
+    - name: Clone a github repository
+      become: true
+      git:
+       repo: https://github.com/snipe/snipe-it
+       dest: /var/www/snipeit
+       clone: yes
+       update: yes 
+       force: yes
+      
+     
+    - name: Create snipeit database
+      become: true
+      mysql_db: name={{ snipeit_dbname }} state=present
+      register: db_status
+
+    - name: Create snipeit mysql user
+      become: true
+      mysql_user: name={{ snipeit_dbuser }} host='localhost' password={{ snipeit_dbuser_password }} priv=*.*:ALL state=present
+      notify:
+         - start mysql
+
+    - name: Snipe install | Copy updated .env file to snipe-it directory
+      template:
+         src: dotenv
+         dest: /var/www/snipeit/.env
+      become: true
+
+
+    - name: change mode for storage on snipeit
+      become: true
+      file:
+        path: /var/www/snipeit
+        owner: www-data
+        group: www-data
+        mode: "0755"
+        recurse: yes
+
+
+    - name: Enable new site
+      become: true
+      template:
+        src: snipeit.conf
+        dest: /etc/nginx/sites-available/snipeit.com
+
+    - name: Enable new site
+      become: true
+      file:
+        src: /etc/nginx/sites-available/snipeit.conf
+        dest: /etc/nginx/sites-enabled/snipeit.conf
+        state: link
+        force: yes
+      notify:
+        - restart nginx
+
+
+    - name: Snipe install | Generate app_key
+      become: true
+      shell: php artisan migrate
+      args:
+         creates: /var/www/snipeit
+ 
+
+
