@@ -42,6 +42,10 @@
            - php7.4-readline
            - php7.4-fpm
            - php7.4-zip
+           - php7.4-mysql
+           - php7.4-ldap
+           - php7.4-xml
+           - php7.4-tokenizer
 
     - name: Install composer
       become: true
@@ -85,6 +89,7 @@
          - start mysql
 
     - name: Snipe install | Copy updated .env file to snipe-it directory
+      become: true
       template:
          src: dotenv
          dest: /var/www/snipeit/.env
@@ -100,27 +105,52 @@
         mode: "0755"
         recurse: yes
 
+    - name: change mode for storage on snipeit
+      become: true
+      file:
+        path: /var/www/snipeit/public/uploads
+        owner: www-data
+        group: www-data
+        mode: "0755"
+        recurse: yes
+
+
 
     - name: Enable new site
       become: true
       template:
         src: snipeit.conf
         dest: /etc/nginx/sites-available/snipeit.com
+    
+
 
     - name: Enable new site
       become: true
       file:
-        src: /etc/nginx/sites-available/snipeit.conf
-        dest: /etc/nginx/sites-enabled/snipeit.conf
+        src: /etc/nginx/sites-available/snipeit.com
+        dest: /etc/nginx/sites-enabled/snipeit.com
         state: link
         force: yes
       notify:
         - restart nginx
+     
+    - name: composer prefer installation
+      become: true
+      shell: composer update --lock
+      args:
+         creates: /var/www/snipeit
+
+    - name: composer prefer installation
+      become: true
+      shell: composer install
+      args:
+         creates: /var/www/snipeit
+
 
 
     - name: Snipe install | Generate app_key
       become: true
-      shell: php artisan migrate
+      shell: php artisan key:generate
       args:
          creates: /var/www/snipeit
  
