@@ -1,9 +1,9 @@
 ---
 - hosts: localhost
   vars_files:
-       - /home/ubuntu/playbook/vars/external_vars.yml
+       - /var/lib/jenkins/workspace/snipe_it/vars/external_vars.yml
   handlers:     
-       - include: /home/ubuntu/playbook/handlers/main.yml
+       - include: /var/lib/jenkins/workspace/snipe_it/handlers/main.yml
   tasks:
     - name: Update apt repo and cache on all Debian/Ubuntu boxes
       become: true
